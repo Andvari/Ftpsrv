@@ -649,11 +649,8 @@ int ls(char *list, char *path){
     struct dirent *filefromdir;
     int tmpfiletype;
     int tmpfilesize;
-    /*int tmpfiledate;*/
 
     list[0]=0;
-
-    printf("%s\n", path);
 
     if (get_file_type(path) == NONE_) return 1;
 

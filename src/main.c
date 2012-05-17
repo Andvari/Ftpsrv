@@ -17,8 +17,9 @@
 
 #define SERVER_NAME             "nemo server 24.08.2011"
 
+#define CODE_CONNECTION_ALREADY         125
+#define CODE_FILE_STATUS_OK             150
 #define CODE_OK                         200
-#define CODE_NOT_IMPLEMENTED_YET        202
 #define CODE_FILE_SIZE_OK               213
 #define CODE_MDTM_OK                    213
 #define CODE_SYST_INFO                  215
@@ -30,15 +31,14 @@
 #define CODE_USER_LOGGED_IN             230
 #define CODE_REQUEST_ACTION_OK          250
 #define CODE_CURRENT_DIR_OK             257
-#define CODE_FILE_STATUS_OK             150
 #define CODE_USER_OK_PASS_NEED          331
 #define CODE_INVALID_USER_OR_PASS       430
+#define CODE_ACCESS_DENIED              450
+#define CODE_REQUESTED_ACTION_ABORTED_1 451
+#define CODE_NOT_IMPLEMENTED_YET        502
 #define CODE_USER_LOGIN_FAILED          530
 #define CODE_UNEXPECTED_COMMAND         533
 #define CODE_FILE_UNAVAILABLE           550
-#define CODE_REQUESTED_ACTION_ABORTED_1 451
-#define CODE_ACCESS_DENIED              450
-#define CODE_CONNECTION_ALREADY         125
 
 #define UNKN    "\0"
 #define QUIT    "QUIT\0"
@@ -68,6 +68,10 @@
 #define CDUP    "CDUP\0"
 #define XCUP    "XCUP\0"
 #define XRMD    "XRMD\0"
+#define EPRT	"EPRT\0"
+
+#define	IPV4	1
+#define	IPV6	2
 
 #define MAX_SIZE_USERNAME       10
 
@@ -132,6 +136,7 @@ int main(int argc, char** argv) {
     int passive_mode;
     int port_high;
     int port_low;
+    int addr_family;
     char addr[16];
     int ip1, ip2, ip3, ip4;
     char list[MAX_SIZE_LIST];
@@ -143,6 +148,7 @@ int main(int argc, char** argv) {
     char homedir[MAX_LEN_HOMEDIR];
     char *tmpdir;
     char tmpname[MAX_LEN_HOMEDIR];
+    int fProcessed;
 
     sFdFtp  = create_socket();
     create_sockaddr(&addrFtp,  FTP_SERVER_ADDR, PORT_FTP);
@@ -155,6 +161,7 @@ int main(int argc, char** argv) {
     err = (int)getcwd(homedir, sizeof(homedir));
     printf("Home dir: %s\n", homedir);
     sFdFtp2 = -1;
+
     while(1){
         waiting_pass   = 0;
         user_accepted  = 0;
@@ -169,6 +176,7 @@ int main(int argc, char** argv) {
         send_reply(&sFd, CODE_CONNECTION_OK, SERVER_NAME);
 
         while(strcmp(req.cmd, QUIT)!=0){
+        	fProcessed = 0;
             strcpy(req.cmd, UNKN);
             strcpy(req.val, "");
             bzero(buf, sizeof(buf));
@@ -187,8 +195,13 @@ int main(int argc, char** argv) {
                     parse_request(&req, buf);
                 }
             }
+/*
+            strcpy(req.cmd, "EPRT");
+            strcpy(req.val, "|1|193.1.1.225|300|");
+*/
 // CDUP, XCUP
             if((strcmp(req.cmd, CDUP)==0)||(strcmp(req.cmd, XCUP)==0)){
+            	fProcessed=1;
                 if(user_logged_in){
                     err = chdir("..");
                     if(strlen(homedir) > strlen(getcwd(buf, sizeof(buf)))){
@@ -209,6 +222,7 @@ int main(int argc, char** argv) {
             }
 // CWD
             if(strcmp(req.cmd, CWD)==0){
+            	fProcessed=1;
                 if(user_logged_in){
                     err = chdir(req.val);
                     if(strlen(homedir) > strlen(getcwd(buf, sizeof(buf)))){
@@ -229,6 +243,7 @@ int main(int argc, char** argv) {
             }
 // DELE
             if(strcmp(req.cmd, DELE)==0){
+            	fProcessed=1;
                 if(user_logged_in){
                     if(remove(req.val)==0){
                         send_reply(&sFd, CODE_REQUEST_ACTION_OK, "File deleted");
@@ -241,6 +256,7 @@ int main(int argc, char** argv) {
             }
 // EPSV
             if(strcmp(req.cmd, EPSV)==0){
+            	fProcessed=1;
                 if(user_logged_in){
                     port = 65530;
                     sFdFtp2 = create_socket();
@@ -256,8 +272,31 @@ int main(int argc, char** argv) {
                 }
                 continue;
             }
+// EPRT
+            if(strcmp(req.cmd, EPRT)==0){
+            	fProcessed=1;
+                if(user_logged_in==0){
+                    sscanf(strtok(req.val, "|"), "%d", &addr_family);
+                    sscanf(strtok(NULL, "|"),    "%s", &addr[0]);
+                    sscanf(strtok(NULL, "|"),    "%d", &port);
+
+                    if(addr_family == IPV4){
+                    	printf("%s:%d\n", addr, port);
+                    	send_reply(&sFd, CODE_OK, "EPRT Command successful");
+                    	passive_mode=0;
+                    }
+                    else{
+                        send_reply(&sFd, CODE_NOT_IMPLEMENTED_YET, "IPV6 not implemented yet");
+                    }
+                }
+                else{
+                    send_reply(&sFd, CODE_USER_LOGIN_FAILED, "Not logged in");
+                }
+                continue;
+            }
 // LIST NLST
             if((strcmp(req.cmd, LIST)==0)||(strcmp(req.cmd, NLST)==0)){
+            	fProcessed=1;
                 if(user_logged_in){
                     if(port!=0){
                         if(strlen(req.val) == 0){
@@ -299,6 +338,7 @@ int main(int argc, char** argv) {
 
 // MDTM
             if(strcmp(req.cmd, MDTM)==0){
+            	fProcessed=1;
                 if(user_logged_in){
                     send_reply(&sFd, CODE_MDTM_OK, "20110825000000.000");
                 }
@@ -306,21 +346,16 @@ int main(int argc, char** argv) {
             }
 // MKD
             if((strcmp(req.cmd, MKD)==0)||(strcmp(req.cmd, XMKD)==0)){
+            	fProcessed=1;
                 if(user_logged_in){
                     err = mkdir(req.val, 0x777);
                     send_reply(&sFd, CODE_REQUEST_ACTION_OK, strerror(errno));
                 }
                 continue;
             }
-// MODE
-            if(strcmp(req.cmd, MODE)==0){
-                if(user_logged_in){
-                    send_reply(&sFd, CODE_NOT_IMPLEMENTED_YET, "Not implemented yet");
-                }
-                continue;
-            }
 // PASS
             if(strcmp(req.cmd, PASS)==0){
+            	fProcessed=1;
                 if(waiting_pass==1){
                     if(strcmp(req.val, FTP_PASSWORD)==0){
                         if (user_accepted == 1){
@@ -346,6 +381,7 @@ int main(int argc, char** argv) {
             }
 // PASV
             if(strcmp(req.cmd, PASV)==0){
+            	fProcessed=1;
                 if(passive_mode == 0){
                     if(user_logged_in){
                         close(sFdFtp2);
@@ -366,6 +402,7 @@ int main(int argc, char** argv) {
             }
 // PORT
             if(strcmp(req.cmd, PORT)==0){
+            	fProcessed=1;
                 if(user_logged_in){
                     sscanf(strtok(req.val, ","), "%d", &ip1);
                     sscanf(strtok(0, ","), "%d", &ip2);
@@ -386,6 +423,7 @@ int main(int argc, char** argv) {
             }
 // PWD
             if((strcmp(req.cmd, PWD)==0)||(strcmp(req.cmd, XPWD)==0)){
+            	fProcessed=1;
                 if(user_logged_in){
                     sprintf(mess, "%s", getcwd(buf, sizeof(buf)));
                     if(strlen(mess) == strlen(homedir)){
@@ -402,19 +440,14 @@ int main(int argc, char** argv) {
             }
 // QUIT
             if(strcmp(req.cmd, QUIT)==0){
+            	fProcessed=1;
                 send_reply(&sFd, CODE_QUIT, "End of session.");
                 close(sFd);
                 continue;
             }
-// REST
-            if(strcmp(req.cmd, REST)==0){
-                if(user_logged_in){
-                    send_reply(&sFd, CODE_NOT_IMPLEMENTED_YET, "Not implemented yet");
-                }
-                continue;
-            }
 // RETR
             if(strcmp(req.cmd, RETR)==0){
+            	fProcessed=1;
                 if(user_logged_in){
                     if(port!=0){
                         if(passive_mode){
@@ -456,6 +489,7 @@ int main(int argc, char** argv) {
             }
 // RMD, XRMD
             if((strcmp(req.cmd, RMD)==0)||(strcmp(req.cmd, XRMD)==0)){
+            	fProcessed=1;
                 if(user_logged_in){
                     err = remove_dir(req.val);
                     if (err == 0){
@@ -467,15 +501,9 @@ int main(int argc, char** argv) {
                 }
                 continue;
             }
-// SITE
-            if(strcmp(req.cmd, SITE)==0){
-                if(user_logged_in){
-                    send_reply(&sFd, CODE_NOT_IMPLEMENTED_YET, "Not implemented yet");
-                }
-                continue;
-            }
 // SIZE
             if(strcmp(req.cmd, SIZE)==0){
+            	fProcessed=1;
                 if(user_logged_in){
                     switch(get_file_type(req.val)){
                         case NONE_:
@@ -491,6 +519,7 @@ int main(int argc, char** argv) {
             }
 // STOR
             if(strcmp(req.cmd, STOR)==0){
+            	fProcessed=1;
                 if(user_logged_in){
                     if(port!=0){
                         if(passive_mode){
@@ -533,6 +562,7 @@ int main(int argc, char** argv) {
             }
 // SYST
             if(strcmp(req.cmd, SYST)==0){
+            	fProcessed=1;
                 if(user_logged_in){
                     send_reply(&sFd, CODE_SYST_INFO, "UNIX Type: L8");
                 }
@@ -543,6 +573,7 @@ int main(int argc, char** argv) {
             }
 // TYPE
             if(strcmp(req.cmd, TYPE)==0){
+            	fProcessed=1;
                 if(user_logged_in)
                     if(strcmp(req.val, "A\0")==0){
                         type = ASCII;
@@ -559,6 +590,7 @@ int main(int argc, char** argv) {
             }
 // USER
             if(strcmp(req.cmd, USER)==0){
+            	fProcessed=1;
                 if(strlen(req.val)<MAX_SIZE_USERNAME){
                     strcpy(username, req.val);
                 }
@@ -576,6 +608,26 @@ int main(int argc, char** argv) {
                 waiting_pass = 1;
                 continue;
             }
+
+/*
+ABOR, ACCT, ADAT, ALLO, APPE, AUTH
+CCC, CONF
+ENC
+FEAT
+HELP
+LANG, LPRT, LPSV
+MIC, MLSD, MLST
+NOOP
+OPTS
+PBSZ, PROT
+REIN, RNFR, RNTO
+SMNT, STAT, STOU, STRU
+XRCP, XRMD, XRSQ, XSEM, XSEN
+*/
+
+            if(fProcessed == 0){
+                send_reply(&sFd, CODE_NOT_IMPLEMENTED_YET, "Not implemented yet");
+            }
         }
     }
 
@@ -588,8 +640,6 @@ int remove_dir(char *name){
     DIR *dir;
     struct dirent *filefromdir;
     int flag = 0;
-    /*int err;*/
-    /*char buf[MAX_SIZE_PACK];*/
 
     if((dir = opendir(name)) != NULL){
         filefromdir = readdir(dir);

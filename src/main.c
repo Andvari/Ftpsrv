@@ -610,16 +610,13 @@ int main(int argc, char** argv) {
             }
 
 /*
-ABOR, ACCT, ADAT, ALLO, APPE, AUTH
-CCC, CONF
-ENC
-FEAT
+AUTH ADAT PROT PBSZ CCC MIC CONF ENC
+FEAT OPTS
+ABOR, ACCT, ALLO, APPE
 HELP
 LANG, LPRT, LPSV
-MIC, MLSD, MLST
+MLSD, MLST
 NOOP
-OPTS
-PBSZ, PROT
 REIN, RNFR, RNTO
 SMNT, STAT, STOU, STRU
 XRCP, XRMD, XRSQ, XSEM, XSEN
@@ -818,65 +815,3 @@ char *get_file_date(char *path, int type){
  *
  *
  * */
-/*
-1  ABOR
-2  ACCT
-3  ADAT
-4  ALLO
-5  APPE
-6  AUTH
-7  CCC
-8  CDUP    - OK
-9  CONF
-10 CWD     - OK
-11 DELE    - OK
-12 ENC
-13 EPRT
-14 EPSV    - OK
-15 FEAT
-16 HELP
-17 LANG
-18 LIST    - OK
-19 LPRT
-20 LPSV
-21 MDTM    - OK
-22 MIC
-23 MKD     - OK
-24 MLSD
-25 MLST
-26 MODE    - Not implemented yet
-27 NLST    - OK
-28 NOOP
-29 OPTS
-30 PASS    - OK
-31 PASV    - OK
-32 PBSZ
-33 PORT    - OK
-34 PROT
-35 PWD     - OK
-36 QUIT    - OK
-37 REIN
-38 REST    - Not implemented yet
-39 RETR    - OK
-40 RMD     - Not implemented yet
-41 RNFR
-42 RNTO
-43 SITE    - not implemented yet
-44 SIZE    - OK
-45 SMNT
-46 STAT
-47 STOR    - OK
-48 STOU
-49 STRU
-50 SYST    - OK
-51 TYPE    - OK
-52 USER    - OK
-53 XCUP    - OK
-54 XMKD    - OK
-55 XPWD    - OK
-56 XRCP
-57 XRMD
-58 XRSQ
-59 XSEM
-60 XSEN
-*/

@@ -492,7 +492,6 @@ int main(int argc, char** argv) {
 // STOR
             if(strcmp(req.cmd, STOR)==0){
                 if(user_logged_in){
-                    //send_reply(&sFd, CODE_CONNECTION_ALREADY, "Connection already");
                     if(port!=0){
                         if(passive_mode){
                             sFd2 = accept(sFdFtp2, (struct sockaddr *)&clientAddr, &socklen);
@@ -502,29 +501,25 @@ int main(int argc, char** argv) {
                             create_sockaddr(&addrFtp2, addr, port);
                             err = connect(sFd2, (struct sockaddr *)&addrFtp2, sizeof(addrFtp2));
                         }
-                        //fd = open(req.val, O_CREAT|O_EXCL|O_WRONLY, S_IRWXO);
-                        //printf("%s\n", strrchr(req.val, '/'));
                         sprintf(tmpname, "%s", strrchr(req.val, '/')+1);
-                        printf("%s\n", tmpname);
                         req.val[strlen(req.val) - strlen(strrchr(req.val, '/'))] = 0;
-                        printf("%s\n", req.val);
                         tmpdir = getcwd(buf, sizeof(buf));
                         err = chdir(req.val);
-                        fd = open(tmpname, O_CREAT, S_IRWXO);
+                        fd = open(tmpname, O_CREAT|O_RDWR, S_IRWXO);
                         if (fd!=-1){
                             send_reply(&sFd, CODE_FILE_STATUS_OK, "File status okay");
-                            size_body = -1;
+                            size_body = recv(sFd2, body, MAX_FILE_SIZE, MSG_WAITALL);
                             while(size_body != 0){
-                                size_body = recv(sFd2, body, MAX_FILE_SIZE, MSG_WAITALL);
                                 err = write(fd, body, size_body);
+                                size_body = recv(sFd2, body, MAX_FILE_SIZE, MSG_WAITALL);
                             }
                             send_reply(&sFd, CODE_CLOSING_DATA_CONNECTION, "Closing data connections");
                         }
                         else{
                             send_reply(&sFd, CODE_FILE_UNAVAILABLE, "Unable to create file");
                         }
-                        err = chdir(tmpdir);
                         close(fd);
+                        err = chdir(tmpdir);
                         close(sFd2);
                         close(sFdFtp2);
                     }
